@@ -17,11 +17,19 @@ contract PopNad is
         uint256 firstBlockPlayed;
     }
 
-    mapping(address => Player) public players;
-    address[] public playerAddresses;
+    struct LeaderboardEntry {
+        address playerAddress;
+        uint256 balance;
+    }
+
+    mapping(address => Player) public players; // slot 0
+    address[] public playerAddresses; // slot 1
+    LeaderboardEntry[] public leaderboard; // slot 2
 
     event SusEvent(address indexed player);
     event ScoreUpdateEvent(address indexed player, uint256 balance);
+    event UpdateLeaderboardEvent(address indexed player);
+    event MintEvent(address indexed player, uint256 mintAmount, bytes32 hash);
 
     function initialize() public initializer {
         __ERC20_init("PopNad Testnet Token", "POPNAD");
@@ -34,6 +42,68 @@ contract PopNad is
         override
         onlyOwner
     {}
+
+    function updateLeaderboard() public  {
+        uint256 length = playerAddresses.length;
+
+        LeaderboardEntry[] memory tempLeaderboard = new LeaderboardEntry[](
+            length
+        );
+
+        for (uint256 i = 0; i < length; i++) {
+            address player = playerAddresses[i];
+            uint256 balance = balanceOf(player);
+            tempLeaderboard[i] = LeaderboardEntry(player, balance);
+        }
+
+        _quickSort(tempLeaderboard, 0, length - 1);
+     
+        delete leaderboard; 
+        for (uint256 i = 0; i < length && i < 500; i++) {
+            leaderboard.push(tempLeaderboard[i]); 
+        }
+
+        emit UpdateLeaderboardEvent(msg.sender);
+    }
+
+    function _quickSort(
+        LeaderboardEntry[] memory arr,
+        uint256 left,
+        uint256 right
+    ) internal pure {
+        if (left >= right) return;
+
+        uint256 pivotIndex = left + (right - left) / 2; // Choose a pivot
+        LeaderboardEntry memory pivot = arr[pivotIndex];
+        uint256 i = left;
+        uint256 j = right;
+
+        while (i <= j) {
+            while (arr[i].balance > pivot.balance) i++; // Sort in descending order
+            while (arr[j].balance < pivot.balance) j--;
+
+            if (i <= j) {
+                // Swap
+                LeaderboardEntry memory temp = arr[i];
+                arr[i] = arr[j];
+                arr[j] = temp;
+                i++;
+                j--;
+            }
+        }
+
+        // Recursively sort the two halves
+        if (left < j) _quickSort(arr, left, j);
+        if (i < right) _quickSort(arr, i, right);
+    }
+
+    function getLeaderboard()
+        external
+        view
+        returns (LeaderboardEntry[] memory)
+    {
+        return leaderboard;
+    }
 
     function getBalances(address[] calldata users)
         external
@@ -55,7 +125,7 @@ contract PopNad is
         if (
             hash !=
             keccak256(
-                abi.encodePacked(datetime, msg.sender, datetime, datetime)
+                abi.encodePacked(<<REDACTED>>)
             )
         ) {
             emit SusEvent(msg.sender);
@@ -67,10 +137,11 @@ contract PopNad is
             playerAddresses.push(msg.sender);
         }
 
-        uint256 mintAmount = getRandomMintAmount();
+        uint256 mintAmount = getRandomMintAmount() * 1 ether;
 
         _mint(msg.sender, mintAmount);
         emit ScoreUpdateEvent(msg.sender, balanceOf(msg.sender));
+        emit MintEvent(msg.sender, mintAmount, hash);
     }
 
     function getRandomMintAmount() internal view returns (uint256) {
@@ -110,6 +181,9 @@ contract PopNad is
         view
         returns (Player[] memory)
     {
+        require(count!=0, "Count cannot be zero");
+
+
         uint256 totalPlayers = playerAddresses.length;
         if (offset >= totalPlayers) {
             return new Player[](0);
@@ -124,6 +198,7 @@ contract PopNad is
         for (uint256 i = offset; i < end; i++) {
             result[i - offset] = players[playerAddresses[i]];
         }
+
         return result;
     }
 }
