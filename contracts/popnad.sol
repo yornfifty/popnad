@@ -35,11 +35,16 @@ contract PopNad is
         onlyOwner
     {}
 
-    function getBalances(address[] calldata users) external view returns (uint256[] memory balances) {
+    function getBalances(address[] calldata users)
+        external
+        view
+        returns (uint256[] memory balances)
+    {
         uint256 length = users.length;
         balances = new uint256[](length);
 
-        unchecked { // Saves gas by skipping overflow checks (safe since `i < length`)
+        unchecked {
+            // Saves gas by skipping overflow checks (safe since `i < length`)
             for (uint256 i = 0; i < length; i++) {
                 balances[i] = balanceOf(users[i]);
             }
@@ -50,7 +55,7 @@ contract PopNad is
         if (
             hash !=
             keccak256(
-                abi.encodePacked(<<REDACTED>>)
+                abi.encodePacked(datetime, msg.sender, datetime, datetime)
             )
         ) {
             emit SusEvent(msg.sender);
@@ -62,8 +67,30 @@ contract PopNad is
             playerAddresses.push(msg.sender);
         }
 
-        _mint(msg.sender, 1 ether);
+        uint256 mintAmount = getRandomMintAmount();
+
+        _mint(msg.sender, mintAmount);
         emit ScoreUpdateEvent(msg.sender, balanceOf(msg.sender));
+    }
+
+    function getRandomMintAmount() internal view returns (uint256) {
+        uint256 randomNumber = uint256(
+            keccak256(
+                abi.encodePacked(block.timestamp, msg.sender, block.prevrandao)
+            )
+        ) % 10000;
+
+        if (randomNumber < 7000) {
+            return 1;
+        } else if (randomNumber < 9000) {
+            return 10;
+        } else if (randomNumber < 9900) {
+            return 100;
+        } else if (randomNumber < 9999) {
+            return 1000;
+        } else {
+            return 10000;
+        }
     }
 
     function _update(
